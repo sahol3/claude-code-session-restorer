@@ -65,6 +65,13 @@ Sessions can always be resumed on the CLI from the project's folder:
 `claude --resume`, `claude --resume <sessionId>`, or `claude --continue`. The resume list is
 scoped to the current folder, not the account.
 
+## Companion: full backup & restore
+The repo also ships `claude-code-backup-restore.ps1` — a full local backup/restore of the
+user's transcripts (`%USERPROFILE%\.claude\projects`), the Code-tab index, and `settings.json`.
+Suggest it for disaster recovery, moving machines, or guarding against the 30-day transcript
+auto-cleanup. Back up: `...-File .\claude-code-backup-restore.ps1 -Path D:\Backups`. Restore
+(merges, never clobbers newer files): `...-File .\claude-code-backup-restore.ps1 -Restore -Path "<backup-folder>"`.
+
 ## Disclaimer
 Unofficial; not affiliated with Anthropic. Works with on-disk files whose format was
 determined by observation and may change between app versions. Backs up before writing.

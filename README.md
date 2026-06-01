@@ -15,6 +15,13 @@ Windows PowerShell tool (also packaged as a Claude skill).
 
 ---
 
+## What's included
+
+| Script | Use it when |
+|--------|-------------|
+| **`restore-code-tab-sessions.ps1`** | Your transcripts exist but don't show in the Code tab (you switched accounts, or started sessions from the CLI / VS Code). Rebuilds the per-account session index. |
+| **`claude-code-backup-restore.ps1`** | You want a full backup of your transcripts + index (disaster recovery, new machine, before reinstalling, or to beat the 30-day auto-cleanup) — and to restore it anywhere. |
+
 ## The problem
 
 You open Claude Desktop, switch to the **Code** tab… and most of your sessions are gone.
@@ -110,6 +117,30 @@ default 30). To keep history longer, add this to `%USERPROFILE%\.claude\settings
 ```json
 { "cleanupPeriodDays": 3650 }
 ```
+
+## Full backup & restore (the "everything" tool)
+
+`claude-code-backup-restore.ps1` backs up and restores everything that matters — your
+**transcripts** (`%USERPROFILE%\.claude\projects`), the **Code-tab index**, and
+`settings.json`. Transcripts carry no account info, so a backup restores cleanly under **any
+account, on any machine**.
+
+**Back up** (creates `claude-code-backup_<timestamp>\` under the path you choose; defaults to your user folder):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\claude-code-backup-restore.ps1 -Path D:\Backups
+```
+
+**Restore** (merges; it never deletes, and won't overwrite a newer local file unless you pass `-Force`):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\claude-code-backup-restore.ps1 -Restore -Path "D:\Backups\claude-code-backup_YYYYMMDD_HHMMSS"
+```
+
+Close Claude Desktop before restoring the Code-tab index (the script skips it automatically if
+Claude is running). Options: `-TranscriptsOnly`, `-Force`, `-IgnoreRunning`. After restoring
+under a different account, run `restore-code-tab-sessions.ps1` to make the sessions appear in
+the Code tab.
 
 ## Resuming without the app
 
