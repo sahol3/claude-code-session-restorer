@@ -1,0 +1,14 @@
+# Never commit local session data, backups, or personal config
+*_backup_*/
+_dryrun/
+*.jsonl
+.claude/
+.claude.json
+
+# OS / editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
+.vscode/
+.idea/
