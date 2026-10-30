@@ -79,7 +79,12 @@ say() {
   esac
 }
 
-get_size() { stat -f %z "$1" 2>/dev/null || stat -c %s "$1"; }
+# NOTE: GNU stat's -f means "show filesystem info" (not BSD's "-f FORMAT"), so
+# it exits 0 with the wrong output instead of failing over -- branch on $UNAME
+# explicitly rather than chaining with `||`.
+get_size() {
+  if [ "$UNAME" = "Darwin" ]; then stat -f %z "$1"; else stat -c %s "$1"; fi
+}
 
 is_claude_running() {
   if [ "$UNAME" = "Darwin" ]; then

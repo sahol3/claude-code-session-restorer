@@ -141,11 +141,23 @@ if [ "$NO_BACKUP" != "1" ] && [ -d "$APP_BASE" ]; then
 fi
 
 # --- helpers -------------------------------------------------------------
-get_mtime_epoch() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"; }
+# NOTE: GNU stat's -f means "show filesystem info" (not BSD's "-f FORMAT"), so
+# it exits 0 with the wrong output instead of failing over -- branch on $UNAME
+# explicitly rather than chaining with `||`.
+get_size() {
+  if [ "$UNAME" = "Darwin" ]; then stat -f %z "$1"; else stat -c %s "$1"; fi
+}
+get_mtime_epoch() {
+  if [ "$UNAME" = "Darwin" ]; then stat -f %m "$1"; else stat -c %Y "$1"; fi
+}
 get_ctime_epoch() {
   local t
-  t=$(stat -f %B "$1" 2>/dev/null) || t=""
-  if [ -n "$t" ] && [ "$t" != "0" ]; then printf '%s' "$t"; else get_mtime_epoch "$1"; fi
+  if [ "$UNAME" = "Darwin" ]; then
+    t=$(stat -f %B "$1" 2>/dev/null) || t=""
+  else
+    t=$(stat -c %W "$1" 2>/dev/null) || t=""   # GNU: birth time, "0" or "-" if unsupported by the fs
+  fi
+  if [ -n "$t" ] && [ "$t" != "0" ] && [ "$t" != "-" ]; then printf '%s' "$t"; else get_mtime_epoch "$1"; fi
 }
 iso_to_epoch_ms() {
   local iso="$1" clean secs
@@ -203,7 +215,7 @@ get_meta() {
 tmpl_file=""; tmpl_size=-1
 if [ -d "$APP_BASE" ]; then
   while IFS= read -r -d '' f; do
-    sz=$(stat -f %z "$f" 2>/dev/null || stat -c %s "$f")
+    sz=$(get_size "$f")
     if [ "$tmpl_size" -lt 0 ] || [ "$sz" -lt "$tmpl_size" ]; then tmpl_size="$sz"; tmpl_file="$f"; fi
   done < <(find "$APP_BASE" -type f -name 'local_*.json' -print0 2>/dev/null)
 fi
