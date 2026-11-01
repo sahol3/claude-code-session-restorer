@@ -140,8 +140,9 @@ default 30). To keep history longer, add this to `~/.claude/settings.json`
 
 `claude-code-backup-restore.ps1` / `.sh` backs up and restores everything that matters —
 your **transcripts** (`~/.claude/projects`), the **Code-tab index**, and `settings.json`.
-Transcripts carry no account info, so a backup restores cleanly under **any account, on
-any machine**.
+Transcripts carry no account info, so a backup restores cleanly under **any account**. On
+another machine, a session only resumes from a project directory whose encoded path
+matches the original project path.
 
 **Back up** (creates `claude-code-backup_<timestamp>/` under the path you choose; defaults
 to your home folder):
@@ -166,7 +167,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\claude-code-backup-restore
 
 ```bash
 # macOS / Linux
-bash ./claude-code-backup-restore.sh --restore --path "~/Backups/claude-code-backup_YYYYMMDD_HHMMSS"
+bash ./claude-code-backup-restore.sh --restore --path "$HOME/Backups/claude-code-backup_YYYYMMDD_HHMMSS"
 ```
 
 Close Claude Desktop before restoring the Code-tab index (the script skips it automatically
@@ -198,9 +199,9 @@ your skills directory and Claude can run the restore for you when you say things
 - **Windows**: `restore-code-tab-sessions.ps1` / `claude-code-backup-restore.ps1` — Windows
   PowerShell 5.1 or PowerShell 7. No extra install needed.
 - **macOS**: `restore-code-tab-sessions.sh` / `claude-code-backup-restore.sh` — plain Bash,
-  plus `jq`, `uuidgen`, and `rsync`. All three are already present on a stock macOS install
-  (recent macOS even ships `jq` at `/usr/bin/jq`); if `jq` is missing, `brew install jq`
-  gets it with no admin prompt. Verified against the real on-disk layout: card index at
+  plus `jq`, `uuidgen`, and `rsync`. `uuidgen` and `rsync` are preinstalled on every macOS
+  version. `jq` ships at `/usr/bin/jq` on macOS 15 and later; on macOS 14 and earlier, run
+  `brew install jq` (no admin prompt needed). Verified against the real on-disk layout: card index at
   `~/Library/Application Support/Claude/claude-code-sessions/…`, transcripts and settings
   at `~/.claude/…`.
 - **Linux**: same `.sh` scripts and dependencies as macOS (`jq`, `uuidgen` — usually from

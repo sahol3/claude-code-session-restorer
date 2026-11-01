@@ -39,8 +39,10 @@
 #   --ignore-running       Don't abort if Claude appears to be running.
 #   --no-backup            Skip the index backup (testing only).
 #
-# Requires: bash, jq, uuidgen (all preinstalled on macOS; on Linux: `apt
-# install jq uuid-runtime` or equivalent). No sudo/admin needed.
+# Requires: bash, jq, uuidgen. uuidgen is preinstalled on every macOS version;
+# jq ships at /usr/bin/jq on macOS 15+ (run `brew install jq` on macOS 14 and
+# earlier). On Linux: `apt install jq uuid-runtime` or equivalent. No
+# sudo/admin needed.
 # macOS: tested. Linux: best-effort / unverified (XDG card path).
 # For Windows, use restore-code-tab-sessions.ps1 instead. Unofficial tool that
 # works with documented-by-observation app files; backs up before writing and
@@ -55,7 +57,9 @@ NO_BACKUP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --existing-cards-only) EXISTING_CARDS_ONLY=1; shift ;;
-    --dest-root) DEST_ROOT="${2:-}"; shift 2 ;;
+    --dest-root)
+      if [ $# -lt 2 ]; then echo "--dest-root requires a path argument" >&2; exit 1; fi
+      DEST_ROOT="$2"; shift 2 ;;
     --dest-root=*) DEST_ROOT="${1#*=}"; shift ;;
     --ignore-running) IGNORE_RUNNING=1; shift ;;
     --no-backup) NO_BACKUP=1; shift ;;
@@ -136,7 +140,10 @@ mkdir -p "$dest"
 if [ "$NO_BACKUP" != "1" ] && [ -d "$APP_BASE" ]; then
   bk="${APP_BASE}_backup_$(date +%Y%m%d_%H%M%S)"
   mkdir -p "$bk"
-  cp -Rp "$APP_BASE/." "$bk/"
+  if ! cp -Rp "$APP_BASE/." "$bk/"; then
+    say "Index backup failed or is incomplete: $bk. Stopped before copying cards." yellow
+    exit 1
+  fi
   say "Backed up Code-tab index -> $bk" green
 fi
 
@@ -249,9 +256,12 @@ if [ -d "$APP_BASE" ]; then
     have "$key" && continue
     target="$dest/$(basename "$f")"
     if [ -e "$target" ]; then target="$dest/local_$(new_guid).json"; fi
-    cp "$f" "$target"
-    add_have "$key"
-    copied=$((copied + 1))
+    if cp "$f" "$target"; then
+      add_have "$key"
+      copied=$((copied + 1))
+    else
+      say "Failed to copy $f to $target." yellow
+    fi
   done < <(find "$APP_BASE" -type f -name 'local_*.json' -print0 2>/dev/null)
 fi
 say "Copied $copied card(s) from other account folders." green

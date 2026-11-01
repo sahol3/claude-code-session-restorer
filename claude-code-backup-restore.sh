@@ -46,7 +46,9 @@ IGNORE_RUNNING=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --restore) RESTORE=1; shift ;;
-    --path) BPATH="${2:-}"; shift 2 ;;
+    --path)
+      if [ $# -lt 2 ]; then echo "--path requires a value" >&2; exit 1; fi
+      BPATH="$2"; shift 2 ;;
     --path=*) BPATH="${1#*=}"; shift ;;
     --transcripts-only) TRANSCRIPTS_ONLY=1; shift ;;
     --force) FORCE=1; shift ;;
@@ -95,7 +97,10 @@ is_claude_running() {
 }
 
 # Native equivalent of robocopy /E /COPY:DAT [/XO]. $3=1 means "never
-# overwrite a newer destination file" (/XO); otherwise overwrite unconditionally.
+# overwrite a newer destination file" (/XO); otherwise overwrite unconditionally
+# (--ignore-times forces a real re-transfer even if a stale destination file
+# happens to already match the source's size and mtime). Returns non-zero on
+# failure so callers can tell a failed transfer apart from a successful one.
 sync_tree() {
   local src="$1" dst="$2" noclobber="$3" out
   if [ ! -e "$src" ]; then printf 'skipped (source not present)'; return 0; fi
@@ -103,37 +108,43 @@ sync_tree() {
   if [ "$noclobber" = "1" ]; then
     out=$(rsync -a --update "$src/" "$dst/" 2>&1)
   else
-    out=$(rsync -a "$src/" "$dst/" 2>&1)
+    out=$(rsync -a --ignore-times "$src/" "$dst/" 2>&1)
   fi
   if [ $? -eq 0 ]; then
     printf 'ok'
   else
     printf 'ERROR (%s)' "$(printf '%s' "$out" | tail -1)"
+    return 1
   fi
 }
 
 if [ "$RESTORE" = "1" ]; then
   say "== Claude Code RESTORE ==" white
-  if [ -z "$BPATH" ] || [ ! -d "$BPATH/projects" ]; then
-    say "Pass --path to an existing backup folder (the one that contains a 'projects' subfolder)." yellow
+  if [ -z "$BPATH" ] || { [ ! -d "$BPATH/projects" ] && [ ! -d "$BPATH/claude-code-sessions" ] && [ ! -f "$BPATH/settings.json" ]; }; then
+    say "Pass --path to an existing backup folder (one that contains 'projects', 'claude-code-sessions', or 'settings.json')." yellow
     exit 1
   fi
   noclobber=1
   [ "$FORCE" = "1" ] && noclobber=0
-  res=$(sync_tree "$BPATH/projects" "$PROJ_DIR" "$noclobber")
+  FAILED=0
+  res=$(sync_tree "$BPATH/projects" "$PROJ_DIR" "$noclobber") || FAILED=1
   say "transcripts -> $PROJ_DIR : $res" green
   if [ "$TRANSCRIPTS_ONLY" != "1" ]; then
     if is_claude_running && [ "$IGNORE_RUNNING" != "1" ]; then
       say "Skipping Code-tab index: Claude Desktop is running. Close it and re-run (or pass --ignore-running) to restore the index." yellow
     else
-      res=$(sync_tree "$BPATH/claude-code-sessions" "$IDX_DIR" "$noclobber")
+      res=$(sync_tree "$BPATH/claude-code-sessions" "$IDX_DIR" "$noclobber") || FAILED=1
       say "code-tab index -> $IDX_DIR : $res" green
     fi
   fi
-  if [ -f "$BPATH/settings.json" ] && [ ! -f "$SET_FILE" ]; then
+  if [ -f "$BPATH/settings.json" ] && { [ "$FORCE" = "1" ] || [ ! -f "$SET_FILE" ]; }; then
     mkdir -p "$(dirname "$SET_FILE")"
     cp "$BPATH/settings.json" "$SET_FILE"
-    say "settings.json restored (was missing locally)." green
+    say "settings.json restored." green
+  fi
+  if [ "$FAILED" = "1" ]; then
+    say "Restore incomplete: one or more transfers failed (see above)." yellow
+    exit 1
   fi
   say "Restore complete. If sessions don't appear in the Code tab, run restore-code-tab-sessions.sh." cyan
   exit 0
@@ -145,12 +156,16 @@ stamp=$(date +%Y%m%d_%H%M%S)
 root="${BPATH:-$HOME}"
 mkdir -p "$root"
 dest="$root/claude-code-backup_$stamp"
-mkdir -p "$dest"
+if ! mkdir "$dest" 2>/dev/null; then
+  say "Backup folder already exists: $dest. Re-run after one second." yellow
+  exit 1
+fi
 
-res=$(sync_tree "$PROJ_DIR" "$dest/projects" 0)
+FAILED=0
+res=$(sync_tree "$PROJ_DIR" "$dest/projects" 0) || FAILED=1
 say "transcripts    : $res" green
 if [ "$TRANSCRIPTS_ONLY" != "1" ]; then
-  res=$(sync_tree "$IDX_DIR" "$dest/claude-code-sessions" 0)
+  res=$(sync_tree "$IDX_DIR" "$dest/claude-code-sessions" 0) || FAILED=1
   say "code-tab index : $res" green
 fi
 if [ -f "$SET_FILE" ]; then
@@ -180,3 +195,7 @@ mb=$(awk -v b="$tx_bytes" 'BEGIN{printf "%.1f", b/1048576}')
 say "" ''
 say "Backed up $tx_count transcript(s), $mb MB -> $dest" white
 say "Restore later:  ...--restore --path \"$dest\"" cyan
+if [ "$FAILED" = "1" ]; then
+  say "Backup incomplete: one or more transfers failed (see above)." yellow
+  exit 1
+fi

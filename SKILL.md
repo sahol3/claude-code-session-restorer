@@ -20,9 +20,10 @@ Trigger when a user reports any of:
 - "How do I recover / restore my Claude Code history?"
 
 Platform: **Windows** (`.ps1`, Windows PowerShell 5.1 or PowerShell 7), **macOS** (`.sh`,
-plain Bash + `jq`/`uuidgen`/`rsync`, all preinstalled on a stock macOS — verified against
-the real on-disk layout), and **Linux** (`.sh`, same dependencies, best-effort/unverified —
-see Compatibility in the README).
+plain Bash + `jq`/`uuidgen`/`rsync` — `uuidgen`/`rsync` preinstalled on every macOS version,
+`jq` preinstalled on macOS 15+ (`brew install jq` on macOS 14 and earlier) — verified
+against the real on-disk layout), and **Linux** (`.sh`, same dependencies, best-effort/
+unverified — see Compatibility in the README).
 
 ## What's actually wrong (explain this to the user)
 Their conversations are **not lost**. Claude Code keeps every transcript on disk at
@@ -47,8 +48,9 @@ live next to this file — same behavior, platform-conventional flag names.
    powershell -NoProfile -ExecutionPolicy Bypass -File "<path-to-skill>\restore-code-tab-sessions.ps1"
    ```
    ```bash
-   # macOS / Linux — no extra install needed on a stock macOS; on Linux, make sure
-   # jq / uuidgen / rsync are present first (e.g. `apt install jq uuid-runtime rsync`)
+   # macOS / Linux — on macOS 14 and earlier, `brew install jq` first (uuidgen/rsync
+   # are already there); on Linux, make sure jq/uuidgen/rsync are present first
+   # (e.g. `apt install jq uuid-runtime rsync`)
    bash "<path-to-skill>/restore-code-tab-sessions.sh"
    ```
 3. Tell them to **reopen Claude Desktop → Code tab**. Sessions should be listed.
